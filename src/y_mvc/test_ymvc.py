@@ -142,5 +142,85 @@ class TestObjectStore(unittest.TestCase):
         self.assertTrue(obj.on_remove_called)
 
 
+class TestEventHandler(unittest.TestCase):
+
+    def setUp(self):
+        self.observer = ymvc.Observer()
+        self.event_handler = ymvc.EventHandler(self.observer)
+
+    def create_object(self):
+        class Obj(object):
+            def __init__(self):
+                self.on_register_called = False
+                self.on_remove_called = False
+                self.note_value = None
+
+            def handle_note(self, note):
+                self.note_value = note
+
+        return Obj()
+
+    def test_bind(self):
+        obj = self.create_object()
+        self.event_handler.bind("event_name", obj)
+        self.assertIn("event_name", self.event_handler.events)
+
+    def test_unbind(self):
+        obj = self.create_object()
+        self.event_handler.bind("event_name", obj)
+        self.event_handler.unbind("event_name")
+        self.assertNotIn("event_name", self.event_handler.events)
+
+    def test_handle_note(self):
+        obj = self.create_object()
+        self.event_handler.bind("event_name", obj.handle_note)
+        self.observer.notify("event_name", "data", self.event_handler.uid)
+        value = {'event_name': 'event_name',
+                 'data': 'data',
+                 'uid': self.event_handler.uid}
+        self.assertEqual(value, obj.note_value)
+
+    def test_register_event(self):
+        self.event_handler.register_event("event_name")
+        value = {'event_name':
+                 {self.event_handler.uid: self.event_handler.handle_note}}
+        self.assertEqual(value, self.observer.observers)
+
+    def test_unregister_event(self):
+        self.event_handler.register_event("event_name")
+        self.event_handler.unregister_event("event_name")
+        self.assertEqual({}, self.observer.observers)
+
+    def test_unregister_all(self):
+        obj = self.create_object()
+        self.event_handler.bind("event_name", obj)
+        self.event_handler.bind("event_name2", obj)
+        self.event_handler.bind("event_name3", obj)
+        self.assertEqual(3, len(self.observer.observers))
+        self.event_handler.unregister_all()
+        self.assertEqual({}, self.observer.observers)
+
+
+class TestController(unittest.TestCase):
+
+    def setUp(self):
+        self.observer = ymvc.Observer()
+        self.controller = ymvc.Controller(self.observer)
+
+    def test_handle_note(self):
+
+        class Obj(object):
+
+            def handle_note(self, note):
+                print "called"
+                global note_value
+                note_value = note
+        self.controller.bind("event_name", Obj)
+        self.observer.notify("event_name", "data")
+        value = {'event_name': 'event_name',
+                 'data': 'data',
+                 'uid': ''}
+        self.assertEqual(value, note_value)
+
 if __name__ == "__main__":
     unittest.main()
