@@ -212,15 +212,109 @@ class TestController(unittest.TestCase):
         class Obj(object):
 
             def handle_note(self, note):
-                print "called"
                 global note_value
                 note_value = note
+
         self.controller.bind("event_name", Obj)
         self.observer.notify("event_name", "data")
         value = {'event_name': 'event_name',
                  'data': 'data',
                  'uid': ''}
         self.assertEqual(value, note_value)
+
+
+class TestFacade(unittest.TestCase):
+
+    def setUp(self):
+        self.facade = ymvc.Facade()
+
+    def test_model(self):
+        self.assertIsInstance(self.facade.model, ymvc.ObjectStore)
+        self.assertNotEqual(self.facade.model, self.facade.view)
+
+    def test_model_observer(self):
+        self.assertIsInstance(self.facade.model_observer, ymvc.Observer)
+        self.assertNotEqual(self.facade.model_observer,
+                            self.facade.app_observer)
+        self.assertNotEqual(self.facade.model_observer,
+                            self.facade.gui_observer)
+
+    def test_view(self):
+        self.assertIsInstance(self.facade.view, ymvc.ObjectStore)
+        self.assertNotEqual(self.facade.model, self.facade.view)
+
+    def test_app_observer(self):
+        self.assertIsInstance(self.facade.app_observer, ymvc.Observer)
+        self.assertNotEqual(self.facade.model_observer,
+                            self.facade.app_observer)
+        self.assertNotEqual(self.facade.model_observer,
+                            self.facade.gui_observer)
+        self.assertEqual(self.facade.app_observer,
+                         self.facade.controller.observer)
+
+    def test_controller(self):
+        self.assertIsInstance(self.facade.controller, ymvc.Controller)
+        self.assertEqual(self.facade.app_observer,
+                         self.facade.controller.observer)
+
+    def test_gui_observer(self):
+        self.assertIsInstance(self.facade.gui_observer, ymvc.Observer)
+        self.assertNotEqual(self.facade.model_observer,
+                            self.facade.app_observer)
+        self.assertNotEqual(self.facade.model_observer,
+                            self.facade.gui_observer)
+
+
+class TestProxyMixin(unittest.TestCase):
+
+    def setUp(self):
+        self.proxy_mixin = ymvc.ProxyMixin()
+        self.facade = ymvc.Facade()
+        ymvc.facade = self.facade
+
+        class Obj(object):
+            def __init__(self):
+                self.event_handler = EventHandler()
+                self.name = "TestObj"
+                self.on_register_called = False
+                self.on_remove_called = False
+
+            def on_register(self):
+                self.on_register_called = True
+
+            def on_remove(self):
+                self.on_remove_called = True
+
+            def handle_note(self, note):
+                global note_value
+                note_value = note
+
+        class EventHandler(object):
+            def __init__(self):
+                self.on_unregister_all_called = False
+
+            def unregister_all(self):
+                self.on_unregister_all_called = True
+
+        self.obj = Obj()
+
+    def test_has_proxy(self):
+        self.facade.model.register_object("TestObj", self.obj)
+        self.assertTrue(self.proxy_mixin.has_proxy("TestObj"))
+
+    def test_register_proxy(self):
+        self.proxy_mixin.register_proxy(self.obj)
+        self.assertTrue(self.facade.model.has_object("TestObj"))
+
+    def test_retrive_proxy(self):
+        self.facade.model.register_object("TestObj", self.obj)
+        self.assertEqual(self.obj, self.proxy_mixin.retrieve_proxy("TestObj"))
+
+    def test_remove_proxy(self):
+        self.facade.model.register_object("TestObj", self.obj)
+        self.proxy_mixin.remove_proxy("TestObj")
+        self.assertFalse(self.facade.model.has_object("TestObj"))
+        self.assertTrue(self.obj.event_handler.on_unregister_all_called)
 
 if __name__ == "__main__":
     unittest.main()
