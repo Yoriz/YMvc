@@ -285,10 +285,6 @@ class TestProxyMixin(unittest.TestCase):
             def on_remove(self):
                 self.on_remove_called = True
 
-            def handle_note(self, note):
-                global note_value
-                note_value = note
-
         class EventHandler(object):
             def __init__(self):
                 self.on_unregister_all_called = False
@@ -315,6 +311,95 @@ class TestProxyMixin(unittest.TestCase):
         self.proxy_mixin.remove_proxy("TestObj")
         self.assertFalse(self.facade.model.has_object("TestObj"))
         self.assertTrue(self.obj.event_handler.on_unregister_all_called)
+
+
+class TestMediatorMixin(unittest.TestCase):
+
+    def setUp(self):
+        self.mediator_mixin = ymvc.MediatorMixin()
+        self.facade = ymvc.Facade()
+        ymvc.facade = self.facade
+
+        class Obj(object):
+            def __init__(self):
+                self.event_handler = EventHandler()
+                self.gui_event_handler = EventHandler()
+                self.name = "TestObj"
+                self.on_register_called = False
+                self.on_remove_called = False
+
+            def on_register(self):
+                self.on_register_called = True
+
+            def on_remove(self):
+                self.on_remove_called = True
+
+        class EventHandler(object):
+            def __init__(self):
+                self.on_unregister_all_called = False
+
+            def unregister_all(self):
+                self.on_unregister_all_called = True
+
+        self.obj = Obj()
+
+    def test_has_mediator(self):
+        self.facade.view.register_object("TestObj", self.obj)
+        self.assertTrue(self.mediator_mixin.has_mediator("TestObj"))
+
+    def test_register_mediator(self):
+        self.mediator_mixin.register_mediator(self.obj)
+        self.assertTrue(self.facade.view.has_object("TestObj"))
+
+    def test_remove_mediator(self):
+        self.facade.view.register_object("TestObj", self.obj)
+        self.mediator_mixin.remove_medaitor("TestObj")
+        self.assertFalse(self.facade.view.has_object("TestObj"))
+        self.assertTrue(self.obj.event_handler.on_unregister_all_called)
+        self.assertTrue(self.obj.gui_event_handler.on_unregister_all_called)
+
+
+class TestNotifyAppMixin(unittest.TestCase):
+
+    def setUp(self):
+        self.notify_app_mixin = ymvc.NotifyAppMixin()
+        self.facade = ymvc.Facade()
+        ymvc.facade = self.facade
+
+        class Obj(object):
+            def __init__(self):
+                self.event_handler = EventHandler()
+                self.gui_event_handler = EventHandler()
+                self.name = "TestObj"
+                self.on_register_called = False
+                self.on_remove_called = False
+                self.events = {"event_name": self.handle_note}
+
+            def on_register(self):
+                self.on_register_called = True
+
+            def on_remove(self):
+                self.on_remove_called = True
+
+            def handle_note(self, note):
+                global note_value
+                note_value = note
+
+        class EventHandler(object):
+            def __init__(self):
+                self.on_unregister_all_called = False
+
+            def unregister_all(self):
+                self.on_unregister_all_called = True
+
+        self.obj = Obj()
+
+    def test_notify_app(self):
+        self.facade.view.register_object("TestObj", self.obj)
+        self.facade.app_observer.register("test_notify_app",
+                                          self.obj.handle_note, "uid")
+        self.notify_app_mixin.notify_app("test_notify_app", "data", "uid")
+        self.assertEqual("test_notify_app", note_value["event_name"])
 
 if __name__ == "__main__":
     unittest.main()
